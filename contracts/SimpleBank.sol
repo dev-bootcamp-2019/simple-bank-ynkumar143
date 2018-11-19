@@ -6,34 +6,37 @@ contract SimpleBank {
     //
     
     /* Fill in the keyword. Hint: We want to protect our users balance from other contracts*/
-    mapping (address => uint) balances;
+    /* private will only makes teh contracts to access balance information only inside the contract */
+    mapping (address => uint) private balances;
     
     /* Fill in the keyword. We want to create a getter function and allow contracts to be able to see if a user is enrolled.  */
-    mapping (address => bool) enrolled;
+    /* public keyword creates a getter function automatically*/
+    mapping (address => bool) public enrolled;
 
     /* Let's make sure everyone knows who owns the bank. Use the appropriate keyword for this*/
-    address owner;
+    address public owner;
     
     //
     // Events - publicize actions to external listeners
     //
     
     /* Add an argument for this event, an accountAddress */
-    event LogEnrolled();
+    event LogEnrolled(address indexed accountAddress);
 
     /* Add 2 arguments for this event, an accountAddress and an amount */
-    event LogDepositMade();
+    event LogDepositMade(address indexed accountAddress, uint indexed amount);
 
     /* Create an event called LogWithdrawal */
     /* Add 3 arguments for this event, an accountAddress, withdrawAmount and a newBalance */
-
+    event LogWithdrawal(address indexed accountAddress,  uint indexed withdrawAmount, uint indexed newBalance);
 
     //
     // Functions
     //
 
     /* Use the appropriate global variable to get the sender of the transaction */
-    constructor() {
+    constructor() public{
+        owner = msg.sender; 
         /* Set the owner to the creator of this contract */
     }
 
@@ -41,7 +44,8 @@ contract SimpleBank {
     /// @return The balance of the user
     // A SPECIAL KEYWORD prevents function from editing state variables;
     // allows function to run locally/off blockchain
-    function balance() public returns (uint) {
+    function balance() public view returns (uint) {
+        return balances[msg.sender];
         /* Get the balance of the sender of this transaction */
     }
 
@@ -49,6 +53,9 @@ contract SimpleBank {
     /// @return The users enrolled status
     // Emit the appropriate event
     function enroll() public returns (bool){
+        enrolled[msg.sender] = true;
+        emit LogEnrolled(msg.sender);
+        return enrolled[msg.sender];
     }
 
     /// @notice Deposit ether into bank
@@ -56,7 +63,13 @@ contract SimpleBank {
     // Add the appropriate keyword so that this function can receive ether
     // Use the appropriate global variables to get the transaction sender and value
     // Emit the appropriate event    
-    function deposit() public returns (uint) {
+    function deposit() public payable returns (uint){
+        uint amount = msg.value; 
+        address sender = msg.sender; 
+        require((balances[sender] + amount) >= balances[sender]);
+        balances[sender] += amount; 
+        emit LogDepositMade(sender, amount);
+        return balances[sender];
         /* Add the amount to the user's balance, call the event associated with a deposit,
           then return the balance of the user */
     }
@@ -71,6 +84,12 @@ contract SimpleBank {
            Subtract the amount from the sender's balance, and try to send that amount of ether
            to the user attempting to withdraw. 
            return the user's balance.*/
+           address sender = msg.sender; 
+           require(balances[sender] >= withdrawAmount);
+           balances[sender] -= withdrawAmount; 
+           sender.transfer(withdrawAmount);
+           emit LogWithdrawal(sender, withdrawAmount, balances[sender]);
+           return balances[sender];
     }
 
     // Fallback function - Called if other functions don't match call or
@@ -78,7 +97,7 @@ contract SimpleBank {
     // Typically, called when invalid data is sent
     // Added so ether sent to this contract is reverted if the contract fails
     // otherwise, the sender's money is transferred to contract
-    function() {
+    function() public {
         revert();
     }
 }
